@@ -1,1 +1,5 @@
-welcome to Jazzdupphotography.com I'll add more to this as I go![1000006646](https://github.com/user-attachments/assets/3546ae8f-d2f6-4772-b2fc-186e3fb49a98)
+welcome to Jazzdupphotography.com[1000006646]
+
+https://github.com/user-attachments/assets/235420b5-6f91-4b73-a2bf-e16ad6b930e4
+
+
