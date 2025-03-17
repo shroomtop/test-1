@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Enhanced AI Voice Code Editor</title>
+  <style>
+    :root {
+      --bg-color-light: #f0f0f0;
+      --text-color-light: #333;
+      --panel-color-light: rgba(255, 255, 255, 0.7);
+      --bg-color-dark: #1e1e2e;
+      --text-color-dark: #fff;
+      --panel-color-dark: rgba(48, 48, 64, 0.4);
+      --accent-color: #03a9f4;
+      --error-color: #f44336;
+      --transition-speed: 0.3s;
+      --border-radius: 8px;
+    }
+
+    body {
+      margin: 0; 
+      padding: 0;
+      font-family: Arial, sans-serif;
+      transition: background var(--transition-speed), color var(--transition-speed);
+      background: var(--bg-color-dark);
+      color: var(--text-color-dark);
+    }
+    body.light-theme {
+      background: var(--bg-color-light);
+      color: var(--text-color-light);
+    }
+
+    header {
+      padding: 1rem; 
+      text-align: center;
+    }
+    h1 {
+      margin: 0.5rem 0;
+    }
+
+    .theme-toggle {
+      cursor: pointer;
+      padding: 0.5rem 1rem;
+      background: var(--accent-color);
+      border: none;
+      border-radius: var(--border-radius);
+      color: #fff;
+      font-size: 1rem;
+      margin: 0.5rem;
+      transition: background var(--transition-speed);
+    }
+    button.theme-toggle:hover {
+      opacity: 0.8;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    #apiKey {
+      padding: 0.5rem;
+      border-radius: var(--border-radius);
+      border: 1px solid #ccc;
+    }
+
+    #saveApiKeyBtn, #startVoiceBtn {
+      cursor: pointer;
+      background: var(--accent-color);
+      color: #fff;
+      padding: 0.5rem;
+      margin: 0.5rem;
+      border: none;
+      border-radius: var(--border-radius);
+      transition: opacity var(--transition-speed);
+    }
+    #saveApiKeyBtn:hover, #startVoiceBtn:hover {
+      opacity: 0.8;
+    }
+
+    #activityIcon {
+      font-size: 1.2rem;
+      margin-left: 0.5rem;
+    }
+
+    #logScreen {
+      width: 90%;
+      max-width: 800px;
+      height: 120px;
+      margin: 0.5rem auto;
+      padding: 0.5rem;
+      border-radius: var(--border-radius);
+      overflow-y: auto;
+      font-size: 0.9rem;
+      background: var(--panel-color-dark);
+      transition: background var(--transition-speed);
+    }
+    body.light-theme #logScreen {
+      background: var(--panel-color-light);
+    }
+
+    .editor-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    textarea {
+      width: 280px;
+      height: 150px;
+      border-radius: var(--border-radius);
+      border: 2px solid var(--accent-color);
+      background: var(--panel-color-dark);
+      color: #fff;
+      padding: 0.5rem;
+      transition: background var(--transition-speed), color var(--transition-speed);
+      font-family: monospace;
+    }
+    body.light-theme textarea {
+      background: var(--panel-color-light);
+      color: var(--text-color-light);
+    }
+
+    .preview-container {
+      width: 100%;
+      max-width: 800px;
+      margin: 1rem auto;
+    }
+    iframe {
+      width: 100%;
+      height: 300px;
+      border: 2px solid var(--accent-color);
+      border-radius: var(--border-radius);
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Enhanced AI Voice Code Editor</h1>
+  </header>
+
+  <div class="top-bar">
+    <input 
+      type="text"
+      id="apiKey"
+      placeholder="Enter OpenAI API Key (optional)"
+      aria-label="OpenAI API Key"
+    />
+    <button id="saveApiKeyBtn" onclick="saveApiKey()" aria-label="Save API Key">
+      Save API Key
+    </button>
+    <button id="startVoiceBtn" onclick="startVoiceChat()" aria-label="Start AI Voice Chat">
+      🎤 Start AI Voice Chat
+    </button>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle light/dark theme">
+      Toggle Theme
+    </button>
+    <span id="activityIcon" aria-hidden="true"></span>
+  </div>
+
+  <div id="logScreen" role="log" aria-live="polite"></div>
+
+  <div class="editor-container">
+    <textarea id="htmlInput" placeholder="HTML"></textarea>
+    <textarea id="cssInput" placeholder="CSS"></textarea>
+    <textarea id="jsInput" placeholder="JavaScript"></textarea>
+  </div>
+
+  <div class="preview-container">
+    <iframe id="preview"></iframe>
+  </div>
+
+  <script>
+    /********************************************
+     *          THEME TOGGLING
+     ********************************************/
+    function toggleTheme() {
+      document.body.classList.toggle('light-theme');
+    }
+
+    /********************************************
+     *          LOGGING UTILITY
+     ********************************************/
+    const logScreen = document.getElementById('logScreen');
+    function logAction(message) {
+      const time = new Date().toLocaleTimeString();
+      logScreen.innerHTML += `[${time}] ${message}<br>`;
+      logScreen.scrollTop = logScreen.scrollHeight;
+    }
+
+    /********************************************
+     *          API KEY MANAGEMENT
+     ********************************************/
+    const apiKeyInput = document.getElementById('apiKey');
+    const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
+
+    // Load stored key from sessionStorage
+    const savedKey = sessionStorage.getItem('apiKey') || '';
+    if (savedKey) {
+      apiKeyInput.value = savedKey;
+    }
+
+    function saveApiKey() {
+      if (!apiKeyInput.value) {
+        logAction("API key cleared from session.");
+        sessionStorage.removeItem('apiKey');
+      } else {
+        sessionStorage.setItem('apiKey', apiKeyInput.value.trim());
+        logAction("API key saved to session.");
+      }
+      // Optionally hide the input after saving:
+      // apiKeyInput.style.display = 'none';
+      // saveApiKeyBtn.style.display = 'none';
+    }
+
+    /********************************************
+     *          PREVIEW UPDATE
+     ********************************************/
+    const htmlInput = document.getElementById('htmlInput');
+    const cssInput = document.getElementById('cssInput');
+    const jsInput = document.getElementById('jsInput');
+    const iframePreview = document.getElementById('preview');
+
+    function updatePreview() {
+      const html = htmlInput.value;
+      const css = "<style>" + cssInput.value + "</style>";
+      const js = "<script>" + jsInput.value + "<\/script>";
+
+      const doc = iframePreview.contentWindow.document;
+      doc.open();
+      doc.write(html + css + js);
+      doc.close();
+    }
+
+    // Simple debounce mechanism
+    let debounceTimer;
+    function handleEditorChange() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(updatePreview, 400);
+    }
+
+    htmlInput.addEventListener('input', handleEditorChange);
+    cssInput.addEventListener('input', handleEditorChange);
+    jsInput.addEventListener('input', handleEditorChange);
+
+    // Load initial code
+    htmlInput.value = "<h1>Welcome</h1><p>This is a starting template.</p>";
+    cssInput.value = "body { background: #f0f0f0; color: #333; text-align: center; }\\nh1 { color: #03A9F4; }";
+    jsInput.value = "console.log('Template loaded!');";
+    updatePreview();
+
+    /********************************************
+     *      SPEECH RECOGNITION SETUP
+     ********************************************/
+    const activityIcon = document.getElementById('activityIcon');
+    let recognition;
+    let finalizingClarification = false;
+
+    if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) {
+      alert("Your browser doesn’t support the Web Speech API.\nPlease use Chrome or another supported browser.");
+    } else {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.lang = "en-US";
+
+      recognition.onstart = () => {
+        activityIcon.textContent = "🎤";
+        logAction("Listening for voice input...");
+      };
+
+      recognition.onend = () => {
+        activityIcon.textContent = "";
+        logAction("Stopped listening.");
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript.trim();
+        logAction(`Heard command: "${transcript}"`);
+        processVoiceCommand(transcript);
+      };
+    }
+
+    function startVoiceChat() {
+      if (recognition) {
+        recognition.start();
+      }
+    }
+
+    /********************************************
+     *    GET EDITOR STATE FOR CONTEXT
+     ********************************************/
+    function getScreenContent() {
+      const previewDoc = iframePreview.contentWindow.document;
+      return {
+        html: htmlInput.value,
+        css: cssInput.value,
+        js: jsInput.value,
+        preview: previewDoc.body.innerHTML
+      };
+    }
+
+    /********************************************
+     *      AI COMMAND PROCESSING
+     ********************************************/
+    async function processVoiceCommand(command) {
+      let apiKey = sessionStorage.getItem('apiKey') || '';
+      if (!apiKey) {
+        logAction("Warning: No API key set. Please enter your API key or proceed without AI calls.");
+        const utter = new SpeechSynthesisUtterance("No API key found. Please enter it if you want me to update code.");
+        speechSynthesis.speak(utter);
+        return;
+      }
+
+      activityIcon.textContent = "🤔";
+      logAction("Processing command via OpenAI...");
+
+      const screenContent = getScreenContent();
+
+      // Basic prompt: also includes instructions to clarify ambiguous requests
+      const prompt = `
+      You are an advanced HTML/CSS/JS code assistant. The current editor state is:
+      HTML: ${screenContent.html}
+      CSS: ${screenContent.css}
+      JS: ${screenContent.js}
+      Rendered Preview: ${screenContent.preview}
+
+      User's voice command: "${command}"
+
+      Provide a short, spoken explanation. Then specify updated code with "HTML:", "CSS:", or "JS:" lines.
+      If the request is ambiguous, ask a clarifying question in your short explanation before providing code.
+      `;
+
+      try {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: "gpt-4",
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.3
+          })
+        });
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error.message);
+        }
+
+        const aiResponse = data.choices[0].message.content;
+        logAction(`AI Response: ${aiResponse}`);
+        applyAIChanges(aiResponse);
+
+      } catch (err) {
+        activityIcon.textContent = "";
+        const errorMsg = "OpenAI API Error: " + err.message;
+        logAction(errorMsg);
+        const utter = new SpeechSynthesisUtterance(errorMsg);
+        speechSynthesis.speak(utter);
+      } finally {
+        activityIcon.textContent = "";
+      }
+    }
+
+    /********************************************
+     *       APPLY AI CHANGES
+     ********************************************/
+    function applyAIChanges(response) {
+      // Split lines, ignoring blank lines
+      const lines = response.split('\n').map(l => l.trim()).filter(Boolean);
+
+      if (!lines.length) return;
+
+      // The first non-empty line is the "spoken explanation"
+      const verbal = lines[0];
+      if (verbal) {
+        const utterance = new SpeechSynthesisUtterance(verbal);
+        speechSynthesis.speak(utterance);
+        logAction(`Spoken: "${verbal}"`);
+      }
+
+      // If the assistant was uncertain or asked for clarification,
+      // it might not provide code updates. Let’s detect that scenario:
+      const isAskingClarification = verbal.toLowerCase().includes('clarify') 
+                                 || verbal.toLowerCase().includes('ambiguous')
+                                 || verbal.toLowerCase().includes('sure what you meant');
+      if (isAskingClarification) {
+        logAction("AI is requesting clarification. Waiting for user's next voice command to finalize changes.");
+        finalizingClarification = true;
+        return;
+      }
+
+      let htmlUpdated = false, cssUpdated = false, jsUpdated = false;
+      let currentSection = null;
+      let codeBuffer = { HTML: [], CSS: [], JS: [] };
+
+      // Parse lines to figure out new HTML, CSS, and JS
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.startsWith("HTML:")) {
+          currentSection = "HTML";
+          htmlUpdated = true;
+          codeBuffer.HTML.push(line.replace(/^HTML:\s*/, '').trim());
+        } else if (line.startsWith("CSS:")) {
+          currentSection = "CSS";
+          cssUpdated = true;
+          codeBuffer.CSS.push(line.replace(/^CSS:\s*/, '').trim());
+        } else if (line.startsWith("JS:")) {
+          currentSection = "JS";
+          jsUpdated = true;
+          codeBuffer.JS.push(line.replace(/^JS:\s*/, '').trim());
+        } else if (currentSection) {
+          codeBuffer[currentSection].push(line);
+        }
+      }
+
+      if (htmlUpdated) {
+        const updatedHtml = codeBuffer.HTML.join('\n');
+        htmlInput.value = updatedHtml;
+        logAction("Updated HTML code from AI.");
+      }
+      if (cssUpdated) {
+        const updatedCss = codeBuffer.CSS.join('\n');
+        cssInput.value = updatedCss;
+        logAction("Updated CSS code from AI.");
+      }
+      if (jsUpdated) {
+        const updatedJs = codeBuffer.JS.join('\n');
+        jsInput.value = updatedJs;
+        logAction("Updated JS code from AI.");
+      }
+
+      // Update the preview with any changes
+      updatePreview();
+      logAction("Preview refreshed.");
+    }
+  </script>
+</body>
+</html>
